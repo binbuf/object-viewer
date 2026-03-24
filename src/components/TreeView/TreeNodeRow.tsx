@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { ChevronRight, ChevronDown, Copy, Check, Maximize2 } from 'lucide-react'
 import type { TreeNode } from './types.ts'
 import { getNodePath } from '../../utils/treeBuilder.ts'
+import TimestampLabel from './TimestampLabel.tsx'
 
 interface TreeNodeRowProps {
   node: TreeNode
@@ -142,6 +143,9 @@ export default function TreeNodeRow({ node, isExpanded, isFocused, onToggle, onC
       <span className={`truncate ${TYPE_COLORS[node.type] || ''}`}>
         {formatValue(node)}
       </span>
+
+      {/* Timestamp annotation */}
+      <TimestampLabel node={node} />
 
       {/* Action buttons */}
       <span className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0 pl-2">

@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { Copy, Check, Clock } from 'lucide-react'
 import Modal from '../Modal/Modal.tsx'
 import type { TreeNode } from '../TreeView/types.ts'
 import { getNodePath } from '../../utils/treeBuilder.ts'
+import { useTimezone } from '../../hooks/useTimezone.tsx'
+import { detectTimestamp, formatTimestamp } from '../../utils/timestamp.ts'
 
 interface ValueViewerProps {
   node: TreeNode | null
@@ -26,6 +28,7 @@ function getDisplayValue(node: TreeNode): string {
 
 export default function ValueViewer({ node, open, onClose }: ValueViewerProps) {
   const [copied, setCopied] = useState(false)
+  const { timezone, timestampsEnabled } = useTimezone()
 
   const handleCopy = useCallback(async () => {
     if (!node) return
@@ -33,6 +36,15 @@ export default function ValueViewer({ node, open, onClose }: ValueViewerProps) {
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }, [node])
+
+  const tsInfo = useMemo(
+    () => node && timestampsEnabled ? detectTimestamp(node.value, node.type) : null,
+    [node, timestampsEnabled],
+  )
+  const tsFormatted = useMemo(
+    () => tsInfo ? formatTimestamp(tsInfo.epochMs, timezone) : null,
+    [tsInfo, timezone],
+  )
 
   if (!node) return null
 
@@ -57,6 +69,23 @@ export default function ValueViewer({ node, open, onClose }: ValueViewerProps) {
         <pre className="flex-1 overflow-auto p-4 text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
           {value}
         </pre>
+        {/* Timestamp annotation */}
+        {tsFormatted && (
+          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-sm flex items-center gap-2">
+            <Clock size={14} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <span className="text-amber-600 dark:text-amber-400">
+              {tsFormatted}
+            </span>
+            {tsInfo!.originalTimezone && (
+              <span className="text-gray-500 dark:text-gray-400 text-xs">
+                (source: {tsInfo!.originalTimezone})
+              </span>
+            )}
+            <span className="text-gray-400 dark:text-gray-500 text-xs">
+              {tsInfo!.source.replace(/-/g, ' ')}
+            </span>
+          </div>
+        )}
       </div>
     </Modal>
   )

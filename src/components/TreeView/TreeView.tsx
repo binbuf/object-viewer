@@ -1,9 +1,11 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { Copy, Key, Braces, MapPin, Maximize2, GitBranch, FileText } from 'lucide-react'
+import { Copy, Key, Braces, MapPin, Maximize2, GitBranch, FileText, Clock } from 'lucide-react'
 import type { TreeNode as TreeNodeType } from './types.ts'
 import { buildTree, flattenTree, getNodePath, prefixTreeIds } from '../../utils/treeBuilder.ts'
 import TreeNodeRow from './TreeNodeRow.tsx'
 import ContextMenu, { type ContextMenuItem } from '../ContextMenu/ContextMenu.tsx'
+import { useTimezone } from '../../hooks/useTimezone.tsx'
+import { TIMEZONE_GROUPS } from '../../utils/timestamp.ts'
 
 interface TreeViewProps {
   data: unknown
@@ -64,6 +66,7 @@ interface DocumentSection {
 }
 
 export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocument, onExpandValue, onViewSubtree, onNodeClick }: TreeViewProps) {
+  const { timezone, setTimezone, timestampsEnabled, setTimestampsEnabled } = useTimezone()
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(['root']))
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: TreeNodeType } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -258,11 +261,37 @@ export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocu
         >
           Collapse All
         </button>
-        {searchQuery && (
-          <span className="ml-auto text-gray-500 dark:text-gray-400">
-            {matchCount} match{matchCount !== 1 ? 'es' : ''}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setTimestampsEnabled(!timestampsEnabled)}
+            className={`p-1 rounded ${timestampsEnabled ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'}`}
+            title={timestampsEnabled ? 'Disable timestamp detection' : 'Enable timestamp detection'}
+          >
+            <Clock size={12} />
+          </button>
+          {timestampsEnabled && (
+            <select
+              value={timezone}
+              onChange={e => setTimezone(e.target.value)}
+              className="text-xs px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none"
+            >
+              <option value="local">Local</option>
+              <option value="UTC">UTC</option>
+              {TIMEZONE_GROUPS.map(group => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          )}
+          {searchQuery && (
+            <span className="text-gray-500 dark:text-gray-400">
+              {matchCount} match{matchCount !== 1 ? 'es' : ''}
+            </span>
+          )}
+        </div>
       </div>
       <div ref={containerRef} className="flex-1 overflow-auto">
         {documentRows.map((doc) => (

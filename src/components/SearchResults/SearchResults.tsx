@@ -3,6 +3,7 @@ import { Search, X, ArrowRight } from 'lucide-react'
 import Modal from '../Modal/Modal.tsx'
 import type { TreeNode } from '../TreeView/types.ts'
 import { buildTree, flattenTree, getNodePath, prefixTreeIds } from '../../utils/treeBuilder.ts'
+import TimestampLabel from '../TreeView/TimestampLabel.tsx'
 
 interface SearchResultsProps {
   open: boolean
@@ -165,8 +166,9 @@ export default function SearchResults({ open, onClose, data, isMultiDocument, on
                 <div className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5 truncate">
                   {getNodePath(node)}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate">
-                  {truncateValue(node)}
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate flex items-center">
+                  <span className="truncate">{truncateValue(node)}</span>
+                  <TimestampLabel node={node} />
                 </div>
               </div>
               <ArrowRight size={14} className="text-gray-400 flex-shrink-0 mt-1" />
