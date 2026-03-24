@@ -10,6 +10,7 @@ interface TreeNodeRowProps {
   onToggle: (id: string) => void
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void
   onExpandValue: (node: TreeNode) => void
+  onNodeClick?: (nodeId: string) => void
   searchMatch?: boolean
 }
 
@@ -73,9 +74,15 @@ function shouldShowExpand(node: TreeNode): boolean {
   return false
 }
 
-export default function TreeNodeRow({ node, isExpanded, isFocused, onToggle, onContextMenu, onExpandValue, searchMatch }: TreeNodeRowProps) {
+export default function TreeNodeRow({ node, isExpanded, isFocused, onToggle, onContextMenu, onExpandValue, onNodeClick, searchMatch }: TreeNodeRowProps) {
   const [copied, setCopied] = useState<'path' | 'value' | null>(null)
   const hasChildren = Boolean(node.children && node.children.length > 0)
+
+  const handleRowClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('[data-chevron]')) return
+    onNodeClick?.(node.id)
+  }, [node.id, onNodeClick])
 
   const handleCopy = useCallback(async (type: 'path' | 'value') => {
     const text = type === 'path'
@@ -97,12 +104,14 @@ export default function TreeNodeRow({ node, isExpanded, isFocused, onToggle, onC
 
   return (
     <div
-      className={`group flex items-center h-7 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 font-mono text-sm cursor-default select-none ${bgClass}`}
+      className={`group flex items-center h-7 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 font-mono text-sm cursor-pointer select-none ${bgClass}`}
       style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
+      onClick={handleRowClick}
       onContextMenu={e => onContextMenu(e, node)}
     >
       {/* Expand/Collapse */}
       <span
+        data-chevron
         className="w-4 h-4 flex items-center justify-center flex-shrink-0 cursor-pointer"
         onClick={() => hasChildren && onToggle(node.id)}
       >

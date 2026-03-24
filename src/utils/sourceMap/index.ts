@@ -5,7 +5,7 @@ import { buildYamlSourceMap } from './yaml.ts'
 import { buildXmlSourceMap } from './xml.ts'
 import { buildJwtSourceMap } from './jwt.ts'
 
-export { findNodeAtOffset } from './findNode.ts'
+export { findNodeAtOffset, findSpanForNode } from './findNode.ts'
 export type { SourceMap, SourceSpan } from './types.ts'
 
 export function buildSourceMap(source: string, format: FormatId, isMultiDocument: boolean): SourceMap | null {

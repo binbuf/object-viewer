@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import Toolbar from './components/Toolbar/Toolbar.tsx'
 import InputArea from './components/InputArea/InputArea.tsx'
 import TreeView from './components/TreeView/TreeView.tsx'
@@ -10,7 +10,7 @@ import SearchResults from './components/SearchResults/SearchResults.tsx'
 import { useTheme } from './hooks/useTheme.ts'
 import { useDecoder } from './hooks/useDecoder.ts'
 import { tokenizeSource } from './utils/tokenizers/index.ts'
-import { buildSourceMap, findNodeAtOffset } from './utils/sourceMap/index.ts'
+import { buildSourceMap, findNodeAtOffset, findSpanForNode } from './utils/sourceMap/index.ts'
 import type { TreeNode } from './components/TreeView/types.ts'
 import { AlertTriangle } from 'lucide-react'
 
@@ -24,6 +24,8 @@ export default function App() {
   const [subtreeNode, setSubtreeNode] = useState<TreeNode | null>(null)
   const [searchResultsOpen, setSearchResultsOpen] = useState(false)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const [sourceScrollTarget, setSourceScrollTarget] = useState<{ offset: number; length: number; seq: number } | null>(null)
+  const scrollSeqRef = useRef(0)
 
   const handleNavigateToNode = useCallback((nodeId: string) => {
     setFocusedNodeId(nodeId)
@@ -47,6 +49,15 @@ export default function App() {
     if (nodeId) handleNavigateToNode(nodeId)
   }, [sourceMap, handleNavigateToNode])
 
+  const handleTreeNodeClick = useCallback((nodeId: string) => {
+    if (!sourceMap) return
+    const span = findSpanForNode(sourceMap, nodeId)
+    if (span) {
+      scrollSeqRef.current++
+      setSourceScrollTarget({ offset: span.startOffset, length: span.endOffset - span.startOffset, seq: scrollSeqRef.current })
+    }
+  }, [sourceMap])
+
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       <Toolbar theme={theme} onToggleTheme={toggleTheme} onRefresh={refresh} />
@@ -64,6 +75,7 @@ export default function App() {
             detectedFormat={result?.format ?? null}
             tokens={tokens}
             onSourceClick={handleSourceClick}
+            sourceScrollTarget={sourceScrollTarget}
           />
         </div>
 
@@ -90,6 +102,7 @@ export default function App() {
                   isMultiDocument={result.isMultiDocument}
                   onExpandValue={setExpandedValueNode}
                   onViewSubtree={setSubtreeNode}
+                  onNodeClick={handleTreeNodeClick}
                 />
               </div>
             </>

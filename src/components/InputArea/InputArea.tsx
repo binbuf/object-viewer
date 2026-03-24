@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Upload, X, Clipboard, Wand2 } from 'lucide-react'
 import type { FormatId } from '../../decoders/types.ts'
 import { getAvailableFormats } from '../../decoders/index.ts'
@@ -16,17 +16,42 @@ interface InputAreaProps {
   detectedFormat: FormatId | null
   tokens?: SourceToken[] | null
   onSourceClick?: (offset: number) => void
+  sourceScrollTarget?: { offset: number; length: number } | null
 }
 
 const formats = getAvailableFormats()
 
-export default function InputArea({ value, onChange, onFileDrop, onClear, format, onFormatChange, detectedFormat, tokens, onSourceClick }: InputAreaProps) {
+export default function InputArea({ value, onChange, onFileDrop, onClear, format, onFormatChange, detectedFormat, tokens, onSourceClick, sourceScrollTarget }: InputAreaProps) {
   const [isDragging, setIsDragging] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const highlightRef = useRef<HTMLPreElement>(null)
   const dragCounter = useRef(0)
 
   const hasHighlight = tokens != null && tokens.length > 0
+
+  // Scroll to source location when a tree node is clicked
+  useEffect(() => {
+    if (!sourceScrollTarget || !textareaRef.current) return
+    const { offset, length } = sourceScrollTarget
+    const ta = textareaRef.current
+
+    // Set selection to highlight the span
+    ta.focus()
+    ta.selectionStart = offset
+    ta.selectionEnd = offset + length
+
+    // Calculate line number from offset to scroll there
+    const textBefore = value.substring(0, offset)
+    const lineNum = textBefore.split('\n').length - 1
+    const lineHeight = 20 // approximate line height in px
+    ta.scrollTop = Math.max(0, lineNum * lineHeight - ta.clientHeight / 3)
+
+    // Sync the highlight overlay scroll
+    if (highlightRef.current) {
+      highlightRef.current.scrollTop = ta.scrollTop
+      highlightRef.current.scrollLeft = ta.scrollLeft
+    }
+  }, [sourceScrollTarget, value])
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()

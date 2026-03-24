@@ -12,6 +12,7 @@ interface TreeViewProps {
   isMultiDocument?: boolean
   onExpandValue?: (node: TreeNodeType) => void
   onViewSubtree?: (node: TreeNodeType) => void
+  onNodeClick?: (nodeId: string) => void
 }
 
 function matchesSearch(node: TreeNodeType, query: string): boolean {
@@ -62,7 +63,7 @@ interface DocumentSection {
   tree: TreeNodeType
 }
 
-export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocument, onExpandValue, onViewSubtree }: TreeViewProps) {
+export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocument, onExpandValue, onViewSubtree, onNodeClick }: TreeViewProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(['root']))
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: TreeNodeType } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -285,6 +286,7 @@ export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocu
                 onToggle={toggleNode}
                 onContextMenu={handleContextMenu}
                 onExpandValue={handleExpandValue}
+                onNodeClick={onNodeClick}
                 searchMatch={searchMatchIds.has(node.id)}
               />
             ))}
