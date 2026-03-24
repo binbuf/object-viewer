@@ -68,6 +68,7 @@ export function TimezoneProvider({ children }: { children: ReactNode }) {
   return <TimezoneContext value={value}>{children}</TimezoneContext>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTimezone(): TimezoneContextValue {
   return useContext(TimezoneContext)
 }

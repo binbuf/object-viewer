@@ -81,7 +81,7 @@ function skipPrimitive(source: string, i: number): number {
   // numbers, booleans, null, identifiers
   const start = i
   if (source[i] === '-' || source[i] === '+') i++
-  while (i < source.length && /[a-zA-Z0-9_.xXeE+\-]/.test(source[i])) i++
+  while (i < source.length && /[a-zA-Z0-9_.xXeE+-]/.test(source[i])) i++
   if (i === start) i++ // fallback: skip one char
   return i
 }

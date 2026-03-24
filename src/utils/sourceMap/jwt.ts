@@ -13,12 +13,12 @@ export function buildJwtSourceMap(source: string): SourceMap {
 
   // Header segment
   spans.push({ startOffset: pos, endOffset: pos + parts[0].length, nodeId: 'header', depth: 1 })
-  addDecodedSpans(parts[0], pos, 'header', spans)
+  addDecodedSpans(parts[0])
   pos += parts[0].length + 1 // +1 for dot
 
   // Payload segment
   spans.push({ startOffset: pos, endOffset: pos + parts[1].length, nodeId: 'payload', depth: 1 })
-  addDecodedSpans(parts[1], pos, 'payload', spans)
+  addDecodedSpans(parts[1])
   pos += parts[1].length + 1 // +1 for dot
 
   // Signature segment (if present)
@@ -33,7 +33,7 @@ export function buildJwtSourceMap(source: string): SourceMap {
   return spans
 }
 
-function addDecodedSpans(base64Part: string, _segmentOffset: number, _parentId: string, _spans: SourceSpan[]) {
+function addDecodedSpans(base64Part: string) {
   // Try to decode and map sub-properties of JWT header/payload
   // The base64 positions don't map cleanly to JSON positions, so we only map top-level
   try {

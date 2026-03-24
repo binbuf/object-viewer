@@ -54,7 +54,7 @@ export function tokenizeXml(source: string): SourceToken[] {
 
       // Tag name
       const nameStart = i
-      while (i < source.length && /[a-zA-Z0-9_.:\-]/.test(source[i])) i++
+      while (i < source.length && /[a-zA-Z0-9_.:-]/.test(source[i])) i++
       if (i > nameStart) push(source.slice(nameStart, i), 'tag')
 
       // Attributes
@@ -68,7 +68,7 @@ export function tokenizeXml(source: string): SourceToken[] {
 
         // Attribute name
         const attrStart = i
-        while (i < source.length && /[a-zA-Z0-9_.:\-]/.test(source[i])) i++
+        while (i < source.length && /[a-zA-Z0-9_.:-]/.test(source[i])) i++
         if (i > attrStart) push(source.slice(attrStart, i), 'attribute')
 
         // Whitespace around =

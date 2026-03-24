@@ -4,7 +4,7 @@ export function buildXmlSourceMap(source: string): SourceMap {
   const spans: SourceSpan[] = []
 
   try {
-    let i = skipNonElement(source, 0)
+    const i = skipNonElement(source, 0)
     if (i >= source.length) return spans
 
     const rootTagName = peekTagName(source, i)
@@ -26,7 +26,7 @@ function peekTagName(source: string, i: number): string | null {
   if (i >= source.length || source[i] !== '<') return null
   i++ // skip <
   const start = i
-  while (i < source.length && /[a-zA-Z0-9_.:\-]/.test(source[i])) i++
+  while (i < source.length && /[a-zA-Z0-9_.:-]/.test(source[i])) i++
   return i > start ? source.slice(start, i) : null
 }
 
@@ -57,7 +57,7 @@ function scanElement(source: string, i: number, path: string[], prefix: string, 
   i++ // skip <
 
   // Skip tag name
-  while (i < source.length && /[a-zA-Z0-9_.:\-]/.test(source[i])) i++
+  while (i < source.length && /[a-zA-Z0-9_.:-]/.test(source[i])) i++
 
   // Skip attributes
   i = skipAttributes(source, i)
@@ -215,7 +215,7 @@ function skipEntireElement(source: string, i: number): number {
   // i is at '<'
   i++ // skip <
   // Skip tag name
-  while (i < source.length && /[a-zA-Z0-9_.:\-]/.test(source[i])) i++
+  while (i < source.length && /[a-zA-Z0-9_.:-]/.test(source[i])) i++
   // Skip attributes (handling quoted values)
   i = skipAttributes(source, i)
 
@@ -258,7 +258,7 @@ function skipEntireElement(source: string, i: number): number {
 
     // Opening tag — check if self-closing
     i++ // skip <
-    while (i < source.length && /[a-zA-Z0-9_.:\-]/.test(source[i])) i++
+    while (i < source.length && /[a-zA-Z0-9_.:-]/.test(source[i])) i++
     i = skipAttributes(source, i)
 
     if (source[i] === '/' && i + 1 < source.length && source[i + 1] === '>') {
