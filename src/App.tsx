@@ -9,6 +9,7 @@ import SubtreeViewer from './components/SubtreeViewer/SubtreeViewer.tsx'
 import SearchResults from './components/SearchResults/SearchResults.tsx'
 import { useTheme } from './hooks/useTheme.ts'
 import { useDecoder } from './hooks/useDecoder.ts'
+import { getConversionTargets, convertData } from './utils/convertData.ts'
 import { tokenizeSource } from './utils/tokenizers/index.ts'
 import { buildSourceMap, findNodeAtOffset, findSpanForNode } from './utils/sourceMap/index.ts'
 import type { TreeNode } from './components/TreeView/types.ts'
@@ -16,7 +17,7 @@ import { AlertTriangle } from 'lucide-react'
 
 export default function App() {
   const { theme, toggleTheme } = useTheme()
-  const { input, result, error, overrideFormat, setInput, setFormat, processFile, refresh, clear } = useDecoder()
+  const { input, result, error, overrideFormat, setInput, setInputFresh, setFormat, processFile, refresh, clear } = useDecoder()
   const [searchQuery, setSearchQuery] = useState('')
 
   // Modal states
@@ -46,6 +47,17 @@ export default function App() {
     // Clear focus after a few seconds
     setTimeout(() => setFocusedNodeId(null), 3000)
   }, [])
+
+  const conversionTargets = useMemo(() => {
+    if (!result) return []
+    return getConversionTargets(result.format)
+  }, [result])
+
+  const handleConvert = useCallback((target: Parameters<typeof convertData>[1]) => {
+    if (!result) return
+    const converted = convertData(result.data, target, result.isMultiDocument)
+    setInputFresh(converted)
+  }, [result, setInputFresh])
 
   const tokens = useMemo(() => {
     if (!result || !input) return null
@@ -110,6 +122,8 @@ export default function App() {
             format={result?.format ?? null}
             formatLabel={result?.formatLabel ?? null}
             itemCount={result?.itemCount}
+            conversionTargets={conversionTargets}
+            onConvert={handleConvert}
           />
 
           {result && (

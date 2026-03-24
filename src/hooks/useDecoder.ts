@@ -132,6 +132,10 @@ export function useDecoder() {
     processInput(text, state.overrideFormat)
   }, [processInput, state.overrideFormat])
 
+  const setInputFresh = useCallback((text: string) => {
+    processInput(text, null)
+  }, [processInput])
+
   const setFormat = useCallback((format: FormatId | null) => {
     processInput(state.input, format)
   }, [processInput, state.input])
@@ -150,9 +154,10 @@ export function useDecoder() {
     error: state.error,
     overrideFormat: state.overrideFormat,
     setInput,
+    setInputFresh,
     setFormat,
     processFile,
     refresh,
     clear,
-  }), [state, setInput, setFormat, processFile, refresh, clear])
+  }), [state, setInput, setInputFresh, setFormat, processFile, refresh, clear])
 }
