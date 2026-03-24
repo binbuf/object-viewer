@@ -3,6 +3,8 @@ import { Upload, X, Clipboard, Wand2 } from 'lucide-react'
 import type { FormatId } from '../../decoders/types.ts'
 import { getAvailableFormats } from '../../decoders/index.ts'
 import { formatInput } from '../../utils/formatInput.ts'
+import type { SourceToken } from '../../utils/tokenizers/types.ts'
+import HighlightedSource from './HighlightedSource.tsx'
 
 interface InputAreaProps {
   value: string
@@ -12,14 +14,19 @@ interface InputAreaProps {
   format: FormatId | null
   onFormatChange: (format: FormatId | null) => void
   detectedFormat: FormatId | null
+  tokens?: SourceToken[] | null
+  onSourceClick?: (offset: number) => void
 }
 
 const formats = getAvailableFormats()
 
-export default function InputArea({ value, onChange, onFileDrop, onClear, format, onFormatChange, detectedFormat }: InputAreaProps) {
+export default function InputArea({ value, onChange, onFileDrop, onClear, format, onFormatChange, detectedFormat, tokens, onSourceClick }: InputAreaProps) {
   const [isDragging, setIsDragging] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const highlightRef = useRef<HTMLPreElement>(null)
   const dragCounter = useRef(0)
+
+  const hasHighlight = tokens != null && tokens.length > 0
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -60,6 +67,21 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
     const formatted = formatInput(value, fmt)
     if (formatted !== value) onChange(formatted)
   }, [value, format, detectedFormat, onChange])
+
+  const handleScroll = useCallback(() => {
+    if (textareaRef.current && highlightRef.current) {
+      highlightRef.current.scrollTop = textareaRef.current.scrollTop
+      highlightRef.current.scrollLeft = textareaRef.current.scrollLeft
+    }
+  }, [])
+
+  const handleClick = useCallback(() => {
+    if (!onSourceClick || !textareaRef.current) return
+    const { selectionStart, selectionEnd } = textareaRef.current
+    if (selectionStart === selectionEnd) {
+      onSourceClick(selectionStart)
+    }
+  }, [onSourceClick])
 
   const byteCount = new TextEncoder().encode(value).length
   const canFormat = Boolean(value.trim() && (format || detectedFormat))
@@ -119,15 +141,26 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
         )}
       </div>
 
-      {/* Textarea */}
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Paste JSON, JWT, XML, YAML, or drop a file (MessagePack, CBOR, Protobuf)..."
-        className="flex-1 w-full p-3 bg-transparent text-sm font-mono text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none"
-        spellCheck={false}
-      />
+      {/* Editor area with optional syntax highlighting overlay */}
+      <div className="flex-1 relative min-h-0">
+        {hasHighlight && (
+          <HighlightedSource ref={highlightRef} tokens={tokens} />
+        )}
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onScroll={handleScroll}
+          onClick={handleClick}
+          placeholder="Paste JSON, JWT, XML, YAML, or drop a file (MessagePack, CBOR, Protobuf)..."
+          className={`absolute inset-0 w-full h-full p-3 bg-transparent text-sm font-mono resize-none focus:outline-none ${
+            hasHighlight
+              ? 'text-transparent caret-gray-800 dark:caret-gray-200 selection:bg-blue-200/50 dark:selection:bg-blue-700/50'
+              : 'text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500'
+          }`}
+          spellCheck={false}
+        />
+      </div>
 
       {/* Drag overlay */}
       {isDragging && (

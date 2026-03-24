@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Toolbar from './components/Toolbar/Toolbar.tsx'
 import InputArea from './components/InputArea/InputArea.tsx'
 import TreeView from './components/TreeView/TreeView.tsx'
@@ -9,6 +9,8 @@ import SubtreeViewer from './components/SubtreeViewer/SubtreeViewer.tsx'
 import SearchResults from './components/SearchResults/SearchResults.tsx'
 import { useTheme } from './hooks/useTheme.ts'
 import { useDecoder } from './hooks/useDecoder.ts'
+import { tokenizeSource } from './utils/tokenizers/index.ts'
+import { buildSourceMap, findNodeAtOffset } from './utils/sourceMap/index.ts'
 import type { TreeNode } from './components/TreeView/types.ts'
 import { AlertTriangle } from 'lucide-react'
 
@@ -29,6 +31,22 @@ export default function App() {
     setTimeout(() => setFocusedNodeId(null), 3000)
   }, [])
 
+  const tokens = useMemo(() => {
+    if (!result || !input) return null
+    return tokenizeSource(input, result.format)
+  }, [result, input])
+
+  const sourceMap = useMemo(() => {
+    if (!result || !input) return null
+    return buildSourceMap(input, result.format, result.isMultiDocument ?? false)
+  }, [result, input])
+
+  const handleSourceClick = useCallback((offset: number) => {
+    if (!sourceMap) return
+    const nodeId = findNodeAtOffset(sourceMap, offset)
+    if (nodeId) handleNavigateToNode(nodeId)
+  }, [sourceMap, handleNavigateToNode])
+
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       <Toolbar theme={theme} onToggleTheme={toggleTheme} onRefresh={refresh} />
@@ -44,6 +62,8 @@ export default function App() {
             format={overrideFormat}
             onFormatChange={setFormat}
             detectedFormat={result?.format ?? null}
+            tokens={tokens}
+            onSourceClick={handleSourceClick}
           />
         </div>
 
@@ -138,6 +158,7 @@ export default function App() {
           open={searchResultsOpen}
           onClose={() => setSearchResultsOpen(false)}
           data={result.data}
+          isMultiDocument={result.isMultiDocument}
           onNavigate={handleNavigateToNode}
         />
       )}

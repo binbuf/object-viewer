@@ -2,12 +2,13 @@ import { useState, useMemo, useCallback } from 'react'
 import { Search, X, ArrowRight } from 'lucide-react'
 import Modal from '../Modal/Modal.tsx'
 import type { TreeNode } from '../TreeView/types.ts'
-import { buildTree, flattenTree, getNodePath } from '../../utils/treeBuilder.ts'
+import { buildTree, flattenTree, getNodePath, prefixTreeIds } from '../../utils/treeBuilder.ts'
 
 interface SearchResultsProps {
   open: boolean
   onClose: () => void
   data: unknown
+  isMultiDocument?: boolean
   onNavigate: (nodeId: string) => void
 }
 
@@ -41,17 +42,26 @@ function collectAllIds(node: TreeNode): string[] {
   return ids
 }
 
-export default function SearchResults({ open, onClose, data, onNavigate }: SearchResultsProps) {
+export default function SearchResults({ open, onClose, data, isMultiDocument, onNavigate }: SearchResultsProps) {
   const [query, setQuery] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [useRegex, setUseRegex] = useState(false)
 
-  const tree = useMemo(() => buildTree(data), [data])
-
   const allNodes = useMemo(() => {
+    if (isMultiDocument && Array.isArray(data)) {
+      const nodes: ReturnType<typeof flattenTree> = []
+      data.forEach((item, i) => {
+        const prefix = `doc${i}.`
+        const tree = prefixTreeIds(buildTree(item), prefix)
+        const allIds = collectAllIds(tree)
+        nodes.push(...flattenTree(tree, new Set(allIds)))
+      })
+      return nodes
+    }
+    const tree = buildTree(data)
     const allIds = collectAllIds(tree)
     return flattenTree(tree, new Set(allIds))
-  }, [tree])
+  }, [data, isMultiDocument])
 
   const results = useMemo(() => {
     if (!query.trim()) return []

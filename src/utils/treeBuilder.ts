@@ -85,6 +85,14 @@ export function flattenTree(root: TreeNode, expandedIds: Set<string>): TreeNode[
   return result
 }
 
+export function prefixTreeIds(node: TreeNode, prefix: string): TreeNode {
+  return {
+    ...node,
+    id: `${prefix}${node.id}`,
+    children: node.children?.map(child => prefixTreeIds(child, prefix)),
+  }
+}
+
 export function getNodePath(node: TreeNode): string {
   if (node.path.length === 0) return '$'
   return '$.' + node.path.map(segment => {

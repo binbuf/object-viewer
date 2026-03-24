@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { Copy, Key, Braces, MapPin, Maximize2, GitBranch, FileText } from 'lucide-react'
 import type { TreeNode as TreeNodeType } from './types.ts'
-import { buildTree, flattenTree, getNodePath } from '../../utils/treeBuilder.ts'
+import { buildTree, flattenTree, getNodePath, prefixTreeIds } from '../../utils/treeBuilder.ts'
 import TreeNodeRow from './TreeNodeRow.tsx'
 import ContextMenu, { type ContextMenuItem } from '../ContextMenu/ContextMenu.tsx'
 
@@ -54,15 +54,6 @@ function collectAncestorIds(root: TreeNodeType, matchingIds: Set<string>): Set<s
 
   walk(root, [])
   return ancestors
-}
-
-// Prefix all node IDs in a tree to avoid collisions between documents
-function prefixTreeIds(node: TreeNodeType, prefix: string): TreeNodeType {
-  return {
-    ...node,
-    id: `${prefix}${node.id}`,
-    children: node.children?.map(child => prefixTreeIds(child, prefix)),
-  }
 }
 
 interface DocumentSection {
