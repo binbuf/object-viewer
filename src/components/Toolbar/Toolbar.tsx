@@ -8,7 +8,7 @@ interface ToolbarProps {
 
 export default function Toolbar({ theme, onToggleTheme, onRefresh }: ToolbarProps) {
   return (
-    <header className="flex items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <header className="flex items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700/80 bg-white dark:bg-gray-900">
       <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-200 tracking-tight">
         Object Viewer
       </h1>

@@ -59,7 +59,7 @@ export default function App() {
   }, [sourceMap])
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="h-screen flex flex-col bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       <Toolbar theme={theme} onToggleTheme={toggleTheme} onRefresh={refresh} />
 
       <div className="flex-1 flex min-h-0">
