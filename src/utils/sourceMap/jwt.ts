@@ -12,19 +12,19 @@ export function buildJwtSourceMap(source: string): SourceMap {
   let pos = offset
 
   // Header segment
-  spans.push({ startOffset: pos, endOffset: pos + parts[0].length, nodeId: 'root.header', depth: 1 })
-  addDecodedSpans(parts[0], pos, 'root.header', spans)
+  spans.push({ startOffset: pos, endOffset: pos + parts[0].length, nodeId: 'header', depth: 1 })
+  addDecodedSpans(parts[0], pos, 'header', spans)
   pos += parts[0].length + 1 // +1 for dot
 
   // Payload segment
-  spans.push({ startOffset: pos, endOffset: pos + parts[1].length, nodeId: 'root.payload', depth: 1 })
-  addDecodedSpans(parts[1], pos, 'root.payload', spans)
+  spans.push({ startOffset: pos, endOffset: pos + parts[1].length, nodeId: 'payload', depth: 1 })
+  addDecodedSpans(parts[1], pos, 'payload', spans)
   pos += parts[1].length + 1 // +1 for dot
 
   // Signature segment (if present)
   if (parts.length > 2) {
     const sig = parts.slice(2).join('.')
-    spans.push({ startOffset: pos, endOffset: pos + sig.length, nodeId: 'root.signature', depth: 1 })
+    spans.push({ startOffset: pos, endOffset: pos + sig.length, nodeId: 'signature', depth: 1 })
   }
 
   // Root span covers everything
