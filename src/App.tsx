@@ -27,6 +27,20 @@ export default function App() {
   const [sourceScrollTarget, setSourceScrollTarget] = useState<{ offset: number; length: number; seq: number } | null>(null)
   const scrollSeqRef = useRef(0)
 
+  // Panel visibility
+  const [showSource, setShowSource] = useState(true)
+  const [showDisplay, setShowDisplay] = useState(true)
+
+  const toggleSource = useCallback(() => {
+    if (showSource && !showDisplay) return // can't hide both
+    setShowSource(s => !s)
+  }, [showSource, showDisplay])
+
+  const toggleDisplay = useCallback(() => {
+    if (showDisplay && !showSource) return // can't hide both
+    setShowDisplay(s => !s)
+  }, [showSource, showDisplay])
+
   const handleNavigateToNode = useCallback((nodeId: string) => {
     setFocusedNodeId(nodeId)
     // Clear focus after a few seconds
@@ -60,27 +74,38 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
-      <Toolbar theme={theme} onToggleTheme={toggleTheme} onRefresh={refresh} />
+      <Toolbar
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onRefresh={refresh}
+        showSource={showSource}
+        showDisplay={showDisplay}
+        onToggleSource={toggleSource}
+        onToggleDisplay={toggleDisplay}
+      />
 
       <div className="flex-1 flex min-h-0">
         {/* Left panel: Input */}
-        <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-gray-700 min-w-0">
-          <InputArea
-            value={input}
-            onChange={setInput}
-            onFileDrop={processFile}
-            onClear={clear}
-            format={overrideFormat}
-            onFormatChange={setFormat}
-            detectedFormat={result?.format ?? null}
-            tokens={tokens}
-            onSourceClick={handleSourceClick}
-            sourceScrollTarget={sourceScrollTarget}
-          />
-        </div>
+        {showSource && (
+          <div className={`${showDisplay ? 'w-1/2' : 'w-full'} flex flex-col border-r border-gray-200 dark:border-gray-700 min-w-0`}>
+            <InputArea
+              value={input}
+              onChange={setInput}
+              onFileDrop={processFile}
+              onClear={clear}
+              format={overrideFormat}
+              onFormatChange={setFormat}
+              detectedFormat={result?.format ?? null}
+              tokens={tokens}
+              onSourceClick={handleSourceClick}
+              sourceScrollTarget={sourceScrollTarget}
+            />
+          </div>
+        )}
 
         {/* Right panel: Output */}
-        <div className="w-1/2 flex flex-col min-w-0">
+        {showDisplay && (
+        <div className={`${showSource ? 'w-1/2' : 'w-full'} flex flex-col min-w-0`}>
           <Breadcrumbs
             format={result?.format ?? null}
             formatLabel={result?.formatLabel ?? null}
@@ -151,6 +176,7 @@ export default function App() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Modals */}
