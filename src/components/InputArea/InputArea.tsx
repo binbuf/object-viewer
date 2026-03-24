@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Upload, X, Clipboard, Wand2 } from 'lucide-react'
+import { Upload, X, Clipboard, Wand2, FolderOpen, Download } from 'lucide-react'
 import type { FormatId } from '../../decoders/types.ts'
 import { getAvailableFormats } from '../../decoders/index.ts'
 import { formatInput } from '../../utils/formatInput.ts'
@@ -25,6 +25,7 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
   const [isDragging, setIsDragging] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const highlightRef = useRef<HTMLPreElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const dragCounter = useRef(0)
 
   const hasHighlight = tokens != null && tokens.length > 0
@@ -93,6 +94,34 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
     if (formatted !== value) onChange(formatted)
   }, [value, format, detectedFormat, onChange])
 
+  const handleOpenFile = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) onFileDrop(file)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [onFileDrop])
+
+  const handleSaveToFile = useCallback(() => {
+    if (!value) return
+    const ext: Record<string, string> = {
+      json: 'json', json5: 'json5', jwt: 'txt', xml: 'xml',
+      yaml: 'yaml', msgpack: 'msgpack', cbor: 'cbor', protobuf: 'bin',
+    }
+    const filename = `data.${ext[detectedFormat ?? ''] ?? 'txt'}`
+    const blob = new Blob([value], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [value, detectedFormat])
+
   const handleScroll = useCallback(() => {
     if (textareaRef.current && highlightRef.current) {
       highlightRef.current.scrollTop = textareaRef.current.scrollTop
@@ -144,10 +173,25 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
         >
           <Wand2 size={14} />
         </button>
+        <button
+          onClick={handleOpenFile}
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+          title="Open file"
+        >
+          <FolderOpen size={14} />
+        </button>
 
         <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
           {value.length > 0 && `${value.length.toLocaleString()} chars / ${byteCount.toLocaleString()} bytes`}
         </span>
+        <button
+          onClick={handleSaveToFile}
+          disabled={!value}
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Save to file"
+        >
+          <Download size={14} />
+        </button>
         <button
           onClick={handlePaste}
           className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
@@ -186,6 +230,13 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
           spellCheck={false}
         />
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
 
       {/* Drag overlay */}
       {isDragging && (
