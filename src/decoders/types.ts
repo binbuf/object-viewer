@@ -42,6 +42,14 @@ export interface DecodeResult {
   raw: string
   warnings?: string[]
   itemCount?: number
+  isMultiDocument?: boolean
+}
+
+export interface DecodeError {
+  message: string
+  detail?: string
+  format?: FormatId
+  position?: { line: number; column: number }
 }
 
 export interface DetectResult {

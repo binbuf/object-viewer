@@ -1,11 +1,17 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { Copy, Key, Braces, MapPin, Maximize2, GitBranch, FileText } from 'lucide-react'
 import type { TreeNode as TreeNodeType } from './types.ts'
-import { buildTree, flattenTree } from '../../utils/treeBuilder.ts'
+import { buildTree, flattenTree, getNodePath } from '../../utils/treeBuilder.ts'
 import TreeNodeRow from './TreeNodeRow.tsx'
+import ContextMenu, { type ContextMenuItem } from '../ContextMenu/ContextMenu.tsx'
 
 interface TreeViewProps {
   data: unknown
   searchQuery?: string
+  focusedNodeId?: string | null
+  isMultiDocument?: boolean
+  onExpandValue?: (node: TreeNodeType) => void
+  onViewSubtree?: (node: TreeNodeType) => void
 }
 
 function matchesSearch(node: TreeNodeType, query: string): boolean {
@@ -50,56 +56,198 @@ function collectAncestorIds(root: TreeNodeType, matchingIds: Set<string>): Set<s
   return ancestors
 }
 
-export default function TreeView({ data, searchQuery }: TreeViewProps) {
+// Prefix all node IDs in a tree to avoid collisions between documents
+function prefixTreeIds(node: TreeNodeType, prefix: string): TreeNodeType {
+  return {
+    ...node,
+    id: `${prefix}${node.id}`,
+    children: node.children?.map(child => prefixTreeIds(child, prefix)),
+  }
+}
+
+interface DocumentSection {
+  index: number
+  label: string
+  tree: TreeNodeType
+}
+
+export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocument, onExpandValue, onViewSubtree }: TreeViewProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(['root']))
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: TreeNodeType } | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const tree = useMemo(() => buildTree(data), [data])
+  // Build document sections (multi-doc) or single tree
+  const documents = useMemo((): DocumentSection[] => {
+    if (isMultiDocument && Array.isArray(data)) {
+      return data.map((item, i) => {
+        const prefix = `doc${i}.`
+        const tree = prefixTreeIds(buildTree(item), prefix)
+        return { index: i, label: `Object ${i + 1}`, tree }
+      })
+    }
+    return [{ index: 0, label: '', tree: buildTree(data) }]
+  }, [data, isMultiDocument])
 
-  // Search matching
+  // Set initial expanded state for all doc roots
+  useEffect(() => {
+    if (isMultiDocument) {
+      const roots = new Set(documents.map(d => d.tree.id))
+      roots.add('root')
+      setExpandedIds(roots)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMultiDocument, documents.length])
+
+  // Search matching across all documents
   const searchMatchIds = useMemo(() => {
     if (!searchQuery?.trim()) return new Set<string>()
-    const allNodes = collectAllIds(tree)
     const matches = new Set<string>()
-    const allFlat = flattenTree(tree, new Set(allNodes))
-    for (const node of allFlat) {
-      if (matchesSearch(node, searchQuery)) {
-        matches.add(node.id)
+    for (const doc of documents) {
+      const allIds = collectAllIds(doc.tree)
+      const allFlat = flattenTree(doc.tree, new Set(allIds))
+      for (const node of allFlat) {
+        if (matchesSearch(node, searchQuery)) {
+          matches.add(node.id)
+        }
       }
     }
     return matches
-  }, [tree, searchQuery])
+  }, [documents, searchQuery])
 
-  // Auto-expand to show search results
+  // Auto-expand for search and focused node
   const effectiveExpandedIds = useMemo(() => {
-    if (searchMatchIds.size === 0) return expandedIds
-    const ancestors = collectAncestorIds(tree, searchMatchIds)
-    return new Set([...expandedIds, ...ancestors])
-  }, [expandedIds, searchMatchIds, tree])
+    let ids = expandedIds
 
-  const visibleNodes = useMemo(
-    () => flattenTree(tree, effectiveExpandedIds),
-    [tree, effectiveExpandedIds],
-  )
+    if (searchMatchIds.size > 0) {
+      for (const doc of documents) {
+        const ancestors = collectAncestorIds(doc.tree, searchMatchIds)
+        ids = new Set([...ids, ...ancestors])
+      }
+    }
+
+    if (focusedNodeId) {
+      const focusedSet = new Set([focusedNodeId])
+      for (const doc of documents) {
+        const ancestors = collectAncestorIds(doc.tree, focusedSet)
+        ids = new Set([...ids, ...ancestors])
+      }
+    }
+
+    return ids
+  }, [expandedIds, searchMatchIds, documents, focusedNodeId])
+
+  // Flatten visible nodes per document
+  const documentRows = useMemo(() => {
+    return documents.map(doc => ({
+      ...doc,
+      visibleNodes: flattenTree(doc.tree, effectiveExpandedIds),
+    }))
+  }, [documents, effectiveExpandedIds])
+
+  // Scroll to focused node
+  useEffect(() => {
+    if (!focusedNodeId || !containerRef.current) return
+    // Find the row across all documents
+    let cumulativeIndex = 0
+    for (const doc of documentRows) {
+      if (isMultiDocument) cumulativeIndex++ // account for section header
+      const idx = doc.visibleNodes.findIndex(n => n.id === focusedNodeId)
+      if (idx >= 0) {
+        const rowHeight = 28
+        const targetIndex = cumulativeIndex + idx
+        containerRef.current.scrollTop = Math.max(0, targetIndex * rowHeight - containerRef.current.clientHeight / 2)
+        return
+      }
+      cumulativeIndex += doc.visibleNodes.length
+    }
+  }, [focusedNodeId, documentRows, isMultiDocument])
 
   const toggleNode = useCallback((id: string) => {
     setExpandedIds(prev => {
       const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }, [])
 
   const expandAll = useCallback(() => {
-    setExpandedIds(new Set(collectAllIds(tree)))
-  }, [tree])
+    const allIds = new Set<string>()
+    for (const doc of documents) {
+      for (const id of collectAllIds(doc.tree)) {
+        allIds.add(id)
+      }
+    }
+    setExpandedIds(allIds)
+  }, [documents])
 
   const collapseAll = useCallback(() => {
-    setExpandedIds(new Set(['root']))
+    const roots = new Set(documents.map(d => d.tree.id))
+    roots.add('root')
+    setExpandedIds(roots)
+  }, [documents])
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, node: TreeNodeType) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, node })
   }, [])
+
+  const handleExpandValue = useCallback((node: TreeNodeType) => {
+    onExpandValue?.(node)
+  }, [onExpandValue])
+
+  const contextMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!contextMenu) return []
+    const node = contextMenu.node
+    const isComplex = node.type === 'object' || node.type === 'array'
+
+    const items: ContextMenuItem[] = [
+      {
+        label: 'Copy Key',
+        icon: <Key size={14} />,
+        onClick: () => navigator.clipboard.writeText(String(node.key)),
+      },
+      {
+        label: 'Copy Value',
+        icon: <Copy size={14} />,
+        onClick: () => {
+          const text = isComplex ? JSON.stringify(node.value, null, 2) : String(node.value)
+          navigator.clipboard.writeText(text)
+        },
+      },
+      {
+        label: 'Copy Path',
+        icon: <MapPin size={14} />,
+        onClick: () => navigator.clipboard.writeText(getNodePath(node)),
+      },
+    ]
+
+    if (isComplex) {
+      items.push({
+        label: 'Copy Object',
+        icon: <Braces size={14} />,
+        onClick: () => navigator.clipboard.writeText(JSON.stringify(node.value, null, 2)),
+      })
+    }
+
+    items.push({ label: '', onClick: () => {}, separator: true })
+
+    items.push({
+      label: 'Expand Value',
+      icon: <Maximize2 size={14} />,
+      onClick: () => onExpandValue?.(node),
+    })
+
+    if (isComplex) {
+      items.push({
+        label: 'View Subtree',
+        icon: <GitBranch size={14} />,
+        onClick: () => onViewSubtree?.(node),
+      })
+    }
+
+    return items
+  }, [contextMenu, onExpandValue, onViewSubtree])
 
   const matchCount = searchMatchIds.size
 
@@ -124,17 +272,44 @@ export default function TreeView({ data, searchQuery }: TreeViewProps) {
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-auto">
-        {visibleNodes.map(node => (
-          <TreeNodeRow
-            key={node.id}
-            node={node}
-            isExpanded={effectiveExpandedIds.has(node.id)}
-            onToggle={toggleNode}
-            searchMatch={searchMatchIds.has(node.id)}
-          />
+      <div ref={containerRef} className="flex-1 overflow-auto">
+        {documentRows.map((doc) => (
+          <div key={doc.index}>
+            {/* Document section header — only in multi-document mode */}
+            {isMultiDocument && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-[1]">
+                <FileText size={12} className="text-gray-400" />
+                <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                  {doc.label}
+                </span>
+                <div className="flex-1 border-t border-gray-200 dark:border-gray-700 ml-2" />
+              </div>
+            )}
+            {doc.visibleNodes.map(node => (
+              <TreeNodeRow
+                key={node.id}
+                node={node}
+                isExpanded={effectiveExpandedIds.has(node.id)}
+                isFocused={node.id === focusedNodeId}
+                onToggle={toggleNode}
+                onContextMenu={handleContextMenu}
+                onExpandValue={handleExpandValue}
+                searchMatch={searchMatchIds.has(node.id)}
+              />
+            ))}
+          </div>
         ))}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,12 +1,12 @@
 import { useState, useCallback, useMemo } from 'react'
 import { autoDetect, decodeAs } from '../decoders/index.ts'
-import type { DecodeResult, FormatId, DecoderInput } from '../decoders/types.ts'
+import type { DecodeResult, DecodeError, FormatId, DecoderInput } from '../decoders/types.ts'
 import { textToBinary } from '../utils/binaryInput.ts'
 
 interface DecoderState {
   input: string
   result: DecodeResult | null
-  error: string | null
+  error: DecodeError | null
   overrideFormat: FormatId | null
 }
 
@@ -30,39 +30,56 @@ export function useDecoder() {
         source: 'paste',
       }
 
-      // Also try binary interpretation
       const binary = textToBinary(text)
       if (binary) {
         decoderInput.binary = binary
       }
 
-      let result: DecodeResult | null
-
       if (format) {
         try {
-          result = decodeAs(format, decoderInput)
-        } catch {
-          result = autoDetect(decoderInput)
+          const result = decodeAs(format, decoderInput)
+          setState({ input: text, result, error: null, overrideFormat: format })
+          return
+        } catch (err) {
+          // Fall through to auto-detect, but capture the error
+          const message = err instanceof Error ? err.message : String(err)
+          const { result, errors } = autoDetect(decoderInput)
+          if (result) {
+            setState({ input: text, result, error: null, overrideFormat: format })
+          } else {
+            setState({
+              input: text,
+              result: null,
+              error: { message: `${format.toUpperCase()}: ${message}`, format, detail: message },
+              overrideFormat: format,
+            })
+            // If auto-detect also had errors, prefer the most specific one
+            if (errors.length > 0) {
+              setState(prev => ({ ...prev, error: errors[0] }))
+            }
+          }
+          return
         }
-      } else {
-        result = autoDetect(decoderInput)
       }
+
+      const { result, errors } = autoDetect(decoderInput)
 
       if (result) {
         setState({ input: text, result, error: null, overrideFormat: format })
       } else {
-        setState({
-          input: text,
-          result: null,
-          error: 'Could not detect or decode the input format. Supported formats: JSON, JWT, XML, YAML, MessagePack, CBOR, Protobuf.',
-          overrideFormat: format,
-        })
+        const bestError = errors.length > 0
+          ? errors[0]
+          : { message: 'Could not detect or decode the input format. Supported formats: JSON, JWT, XML, YAML, MessagePack, CBOR, Protobuf.' }
+        setState({ input: text, result: null, error: bestError, overrideFormat: format })
       }
     } catch (err) {
       setState({
         input: text,
         result: null,
-        error: err instanceof Error ? err.message : 'Failed to decode input',
+        error: {
+          message: err instanceof Error ? err.message : 'Failed to decode input',
+          detail: err instanceof Error ? err.stack : undefined,
+        },
         overrideFormat: format,
       })
     }
@@ -78,32 +95,30 @@ export function useDecoder() {
         fileName: file.name,
       }
 
-      // Also try as text
       const textReader = new FileReader()
       textReader.onload = () => {
         decoderInput.text = textReader.result as string
-        const result = autoDetect(decoderInput)
+        const { result, errors } = autoDetect(decoderInput)
         if (result) {
           setState({ input: decoderInput.text || `[File: ${file.name}]`, result, error: null, overrideFormat: null })
         } else {
           setState({
             input: `[File: ${file.name}]`,
             result: null,
-            error: `Could not decode file: ${file.name}`,
+            error: errors[0] || { message: `Could not decode file: ${file.name}` },
             overrideFormat: null,
           })
         }
       }
       textReader.onerror = () => {
-        // Binary-only file
-        const result = autoDetect(decoderInput)
+        const { result, errors } = autoDetect(decoderInput)
         if (result) {
           setState({ input: `[File: ${file.name}]`, result, error: null, overrideFormat: null })
         } else {
           setState({
             input: `[File: ${file.name}]`,
             result: null,
-            error: `Could not decode file: ${file.name}`,
+            error: errors[0] || { message: `Could not decode file: ${file.name}` },
             overrideFormat: null,
           })
         }
@@ -121,6 +136,10 @@ export function useDecoder() {
     processInput(state.input, format)
   }, [processInput, state.input])
 
+  const refresh = useCallback(() => {
+    processInput(state.input, state.overrideFormat)
+  }, [processInput, state.input, state.overrideFormat])
+
   const clear = useCallback(() => {
     setState({ input: '', result: null, error: null, overrideFormat: null })
   }, [])
@@ -133,6 +152,7 @@ export function useDecoder() {
     setInput,
     setFormat,
     processFile,
+    refresh,
     clear,
-  }), [state, setInput, setFormat, processFile, clear])
+  }), [state, setInput, setFormat, processFile, refresh, clear])
 }

@@ -1,12 +1,15 @@
 import { useState, useCallback } from 'react'
-import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react'
+import { ChevronRight, ChevronDown, Copy, Check, Maximize2 } from 'lucide-react'
 import type { TreeNode } from './types.ts'
 import { getNodePath } from '../../utils/treeBuilder.ts'
 
 interface TreeNodeRowProps {
   node: TreeNode
   isExpanded: boolean
+  isFocused?: boolean
   onToggle: (id: string) => void
+  onContextMenu: (e: React.MouseEvent, node: TreeNode) => void
+  onExpandValue: (node: TreeNode) => void
   searchMatch?: boolean
 }
 
@@ -64,7 +67,13 @@ function formatValue(node: TreeNode): string {
   return String(node.value)
 }
 
-export default function TreeNodeRow({ node, isExpanded, onToggle, searchMatch }: TreeNodeRowProps) {
+function shouldShowExpand(node: TreeNode): boolean {
+  if (node.type === 'object' || node.type === 'array') return true
+  if (node.type === 'string' && typeof node.value === 'string' && node.value.length > 50) return true
+  return false
+}
+
+export default function TreeNodeRow({ node, isExpanded, isFocused, onToggle, onContextMenu, onExpandValue, searchMatch }: TreeNodeRowProps) {
   const [copied, setCopied] = useState<'path' | 'value' | null>(null)
   const hasChildren = Boolean(node.children && node.children.length > 0)
 
@@ -80,10 +89,17 @@ export default function TreeNodeRow({ node, isExpanded, onToggle, searchMatch }:
     setTimeout(() => setCopied(null), 1500)
   }, [node])
 
+  const bgClass = isFocused
+    ? 'bg-blue-100 dark:bg-blue-900/30'
+    : searchMatch
+      ? 'bg-yellow-100 dark:bg-yellow-900/30'
+      : ''
+
   return (
     <div
-      className={`group flex items-center h-7 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 font-mono text-sm cursor-default select-none ${searchMatch ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}
+      className={`group flex items-center h-7 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 font-mono text-sm cursor-default select-none ${bgClass}`}
       style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
+      onContextMenu={e => onContextMenu(e, node)}
     >
       {/* Expand/Collapse */}
       <span
@@ -118,8 +134,17 @@ export default function TreeNodeRow({ node, isExpanded, onToggle, searchMatch }:
         {formatValue(node)}
       </span>
 
-      {/* Copy buttons */}
+      {/* Action buttons */}
       <span className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0 pl-2">
+        {shouldShowExpand(node) && (
+          <button
+            onClick={() => onExpandValue(node)}
+            className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+            title="Expand value"
+          >
+            <Maximize2 size={12} className="text-gray-400" />
+          </button>
+        )}
         <button
           onClick={() => handleCopy('path')}
           className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"

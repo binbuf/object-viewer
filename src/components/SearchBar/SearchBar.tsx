@@ -1,11 +1,12 @@
-import { Search, X } from 'lucide-react'
+import { Search, X, ExternalLink } from 'lucide-react'
 
 interface SearchBarProps {
   value: string
   onChange: (value: string) => void
+  onOpenSearchResults?: () => void
 }
 
-export default function SearchBar({ value, onChange }: SearchBarProps) {
+export default function SearchBar({ value, onChange, onOpenSearchResults }: SearchBarProps) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-200 dark:border-gray-700">
       <Search size={14} className="text-gray-400 flex-shrink-0" />
@@ -22,6 +23,15 @@ export default function SearchBar({ value, onChange }: SearchBarProps) {
           className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
         >
           <X size={14} className="text-gray-400" />
+        </button>
+      )}
+      {onOpenSearchResults && (
+        <button
+          onClick={onOpenSearchResults}
+          className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+          title="Open advanced search"
+        >
+          <ExternalLink size={14} className="text-gray-400" />
         </button>
       )}
     </div>

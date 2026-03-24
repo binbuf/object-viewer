@@ -1,14 +1,22 @@
 import { useCallback, useRef, useState } from 'react'
-import { Upload, X, Clipboard } from 'lucide-react'
+import { Upload, X, Clipboard, Wand2 } from 'lucide-react'
+import type { FormatId } from '../../decoders/types.ts'
+import { getAvailableFormats } from '../../decoders/index.ts'
+import { formatInput } from '../../utils/formatInput.ts'
 
 interface InputAreaProps {
   value: string
   onChange: (value: string) => void
   onFileDrop: (file: File) => void
   onClear: () => void
+  format: FormatId | null
+  onFormatChange: (format: FormatId | null) => void
+  detectedFormat: FormatId | null
 }
 
-export default function InputArea({ value, onChange, onFileDrop, onClear }: InputAreaProps) {
+const formats = getAvailableFormats()
+
+export default function InputArea({ value, onChange, onFileDrop, onClear, format, onFormatChange, detectedFormat }: InputAreaProps) {
   const [isDragging, setIsDragging] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dragCounter = useRef(0)
@@ -33,11 +41,8 @@ export default function InputArea({ value, onChange, onFileDrop, onClear }: Inpu
     e.preventDefault()
     dragCounter.current = 0
     setIsDragging(false)
-
     const file = e.dataTransfer.files[0]
-    if (file) {
-      onFileDrop(file)
-    }
+    if (file) onFileDrop(file)
   }, [onFileDrop])
 
   const handlePaste = useCallback(async () => {
@@ -45,11 +50,19 @@ export default function InputArea({ value, onChange, onFileDrop, onClear }: Inpu
       const text = await navigator.clipboard.readText()
       onChange(text)
     } catch {
-      // Clipboard API not available, user can paste normally
+      // Clipboard API not available
     }
   }, [onChange])
 
+  const handleFormat = useCallback(() => {
+    const fmt = format || detectedFormat
+    if (!fmt || !value.trim()) return
+    const formatted = formatInput(value, fmt)
+    if (formatted !== value) onChange(formatted)
+  }, [value, format, detectedFormat, onChange])
+
   const byteCount = new TextEncoder().encode(value).length
+  const canFormat = Boolean(value.trim() && (format || detectedFormat))
 
   return (
     <div
@@ -62,6 +75,29 @@ export default function InputArea({ value, onChange, onFileDrop, onClear }: Inpu
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-200 dark:border-gray-700">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Input</span>
+
+        {/* Format selector */}
+        <select
+          value={format || ''}
+          onChange={e => onFormatChange(e.target.value ? e.target.value as FormatId : null)}
+          className="text-xs px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none"
+        >
+          <option value="">Auto-detect</option>
+          {formats.map(f => (
+            <option key={f.id} value={f.id}>{f.label}</option>
+          ))}
+        </select>
+
+        {/* Format/prettify button */}
+        <button
+          onClick={handleFormat}
+          disabled={!canFormat}
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Format / pretty-print"
+        >
+          <Wand2 size={14} />
+        </button>
+
         <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
           {value.length > 0 && `${value.length.toLocaleString()} chars / ${byteCount.toLocaleString()} bytes`}
         </span>

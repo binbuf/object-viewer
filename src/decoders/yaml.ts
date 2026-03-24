@@ -65,6 +65,7 @@ export const yamlDecoder: Decoder = {
           metadata: {},
           raw: text,
           itemCount: items.length,
+          isMultiDocument: true,
         }
       }
     }
