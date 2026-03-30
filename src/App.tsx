@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import Toolbar from './components/Toolbar/Toolbar.tsx'
 import InputArea from './components/InputArea/InputArea.tsx'
 import TreeView from './components/TreeView/TreeView.tsx'
@@ -18,7 +18,13 @@ import { AlertTriangle } from 'lucide-react'
 export default function App() {
   const { theme, toggleTheme } = useTheme()
   const { input, result, error, overrideFormat, setInput, setInputFresh, setFormat, processFile, refresh, clear } = useDecoder()
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQueryRaw] = useState('')
+  const [orderedMatchIds, setOrderedMatchIds] = useState<string[]>([])
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1)
+  const setSearchQuery = useCallback((q: string) => {
+    setSearchQueryRaw(q)
+    setCurrentMatchIndex(-1)
+  }, [])
 
   // Modal states
   const [expandedValueNode, setExpandedValueNode] = useState<TreeNode | null>(null)
@@ -28,9 +34,43 @@ export default function App() {
   const [sourceScrollTarget, setSourceScrollTarget] = useState<{ offset: number; length: number; seq: number } | null>(null)
   const scrollSeqRef = useRef(0)
 
-  // Panel visibility
+  // Panel visibility and resize
   const [showSource, setShowSource] = useState(true)
   const [showDisplay, setShowDisplay] = useState(true)
+  const [splitPercent, setSplitPercent] = useState(50)
+  const isDraggingRef = useRef(false)
+  const splitContainerRef = useRef<HTMLDivElement>(null)
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isDraggingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !splitContainerRef.current) return
+      const rect = splitContainerRef.current.getBoundingClientRect()
+      const pct = ((e.clientX - rect.left) / rect.width) * 100
+      setSplitPercent(Math.min(85, Math.max(15, pct)))
+    }
+
+    const handleMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
 
   const toggleSource = useCallback(() => {
     if (showSource && !showDisplay) return // can't hide both
@@ -42,10 +82,33 @@ export default function App() {
     setShowDisplay(s => !s)
   }, [showSource, showDisplay])
 
+  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const handleNavigateToNode = useCallback((nodeId: string) => {
+    if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current)
     setFocusedNodeId(nodeId)
-    // Clear focus after a few seconds
-    setTimeout(() => setFocusedNodeId(null), 3000)
+    focusTimeoutRef.current = setTimeout(() => setFocusedNodeId(null), 3000)
+  }, [])
+
+  const handleCycleMatch = useCallback((direction: 'next' | 'prev') => {
+    if (orderedMatchIds.length === 0) return
+    setCurrentMatchIndex(prev => {
+      let next: number
+      if (prev === -1) {
+        next = direction === 'next' ? 0 : orderedMatchIds.length - 1
+      } else if (direction === 'next') {
+        next = (prev + 1) % orderedMatchIds.length
+      } else {
+        next = (prev - 1 + orderedMatchIds.length) % orderedMatchIds.length
+      }
+      handleNavigateToNode(orderedMatchIds[next])
+      return next
+    })
+  }, [orderedMatchIds, handleNavigateToNode])
+
+  const handleSearchMatchesChange = useCallback((matchIds: string[]) => {
+    setOrderedMatchIds(matchIds)
+    setCurrentMatchIndex(-1)
   }, [])
 
   const conversionTargets = useMemo(() => {
@@ -96,10 +159,13 @@ export default function App() {
         onToggleDisplay={toggleDisplay}
       />
 
-      <div className="flex-1 flex min-h-0">
+      <div ref={splitContainerRef} className="flex-1 flex min-h-0">
         {/* Left panel: Input */}
         {showSource && (
-          <div className={`${showDisplay ? 'w-1/2' : 'w-full'} flex flex-col border-r border-gray-200 dark:border-gray-700 min-w-0`}>
+          <div
+            className="flex flex-col border-r border-gray-200 dark:border-gray-700 min-w-0"
+            style={{ width: showDisplay ? `${splitPercent}%` : '100%' }}
+          >
             <InputArea
               value={input}
               onChange={setInput}
@@ -115,9 +181,20 @@ export default function App() {
           </div>
         )}
 
+        {/* Resize handle */}
+        {showSource && showDisplay && (
+          <div
+            className="w-1 flex-shrink-0 cursor-col-resize bg-gray-200 dark:bg-gray-700 hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors"
+            onMouseDown={handleDragStart}
+          />
+        )}
+
         {/* Right panel: Output */}
         {showDisplay && (
-        <div className={`${showSource ? 'w-1/2' : 'w-full'} flex flex-col min-w-0`}>
+        <div
+          className="flex flex-col min-w-0"
+          style={{ width: showSource ? `${100 - splitPercent}%` : '100%' }}
+        >
           <Breadcrumbs
             format={result?.format ?? null}
             formatLabel={result?.formatLabel ?? null}
@@ -132,6 +209,9 @@ export default function App() {
                 value={searchQuery}
                 onChange={setSearchQuery}
                 onOpenSearchResults={() => setSearchResultsOpen(true)}
+                matchCount={orderedMatchIds.length}
+                currentMatchIndex={currentMatchIndex}
+                onCycleMatch={handleCycleMatch}
               />
               <div className="flex-1 min-h-0">
                 <TreeView
@@ -142,6 +222,7 @@ export default function App() {
                   onExpandValue={setExpandedValueNode}
                   onViewSubtree={setSubtreeNode}
                   onNodeClick={handleTreeNodeClick}
+                  onSearchMatchesChange={handleSearchMatchesChange}
                 />
               </div>
             </>
@@ -213,6 +294,7 @@ export default function App() {
           data={result.data}
           isMultiDocument={result.isMultiDocument}
           onNavigate={handleNavigateToNode}
+          initialQuery={searchQuery}
         />
       )}
     </div>

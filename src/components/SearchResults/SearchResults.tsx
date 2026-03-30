@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Search, X, ArrowRight } from 'lucide-react'
 import Modal from '../Modal/Modal.tsx'
 import type { TreeNode } from '../TreeView/types.ts'
@@ -11,6 +11,7 @@ interface SearchResultsProps {
   data: unknown
   isMultiDocument?: boolean
   onNavigate: (nodeId: string) => void
+  initialQuery?: string
 }
 
 const TYPE_BADGE_COLORS: Record<string, string> = {
@@ -43,10 +44,17 @@ function collectAllIds(node: TreeNode): string[] {
   return ids
 }
 
-export default function SearchResults({ open, onClose, data, isMultiDocument, onNavigate }: SearchResultsProps) {
+export default function SearchResults({ open, onClose, data, isMultiDocument, onNavigate, initialQuery }: SearchResultsProps) {
   const [query, setQuery] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [useRegex, setUseRegex] = useState(false)
+
+  useEffect(() => {
+    if (open && initialQuery !== undefined) {
+      setQuery(initialQuery)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const allNodes = useMemo(() => {
     if (isMultiDocument && Array.isArray(data)) {

@@ -15,6 +15,7 @@ interface TreeViewProps {
   onExpandValue?: (node: TreeNodeType) => void
   onViewSubtree?: (node: TreeNodeType) => void
   onNodeClick?: (nodeId: string) => void
+  onSearchMatchesChange?: (matchIds: string[]) => void
 }
 
 function matchesSearch(node: TreeNodeType, query: string): boolean {
@@ -65,7 +66,7 @@ interface DocumentSection {
   tree: TreeNodeType
 }
 
-export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocument, onExpandValue, onViewSubtree, onNodeClick }: TreeViewProps) {
+export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocument, onExpandValue, onViewSubtree, onNodeClick, onSearchMatchesChange }: TreeViewProps) {
   const { timezone, setTimezone, timestampsEnabled, setTimestampsEnabled } = useTimezone()
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(['root']))
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: TreeNodeType } | null>(null)
@@ -108,6 +109,25 @@ export default function TreeView({ data, searchQuery, focusedNodeId, isMultiDocu
     }
     return matches
   }, [documents, searchQuery])
+
+  const orderedMatchIds = useMemo(() => {
+    if (searchMatchIds.size === 0) return []
+    const ordered: string[] = []
+    for (const doc of documents) {
+      const allIds = collectAllIds(doc.tree)
+      const allFlat = flattenTree(doc.tree, new Set(allIds))
+      for (const node of allFlat) {
+        if (searchMatchIds.has(node.id)) {
+          ordered.push(node.id)
+        }
+      }
+    }
+    return ordered
+  }, [searchMatchIds, documents])
+
+  useEffect(() => {
+    onSearchMatchesChange?.(orderedMatchIds)
+  }, [orderedMatchIds, onSearchMatchesChange])
 
   // Auto-expand for search and focused node
   const effectiveExpandedIds = useMemo(() => {

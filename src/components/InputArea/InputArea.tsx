@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Upload, X, Clipboard, Wand2, FolderOpen, Download } from 'lucide-react'
 import type { FormatId } from '../../decoders/types.ts'
 import { getAvailableFormats } from '../../decoders/index.ts'
@@ -28,7 +28,16 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragCounter = useRef(0)
 
+  const pendingCursorRef = useRef<{ start: number; end: number } | null>(null)
   const hasHighlight = tokens != null && tokens.length > 0
+
+  useLayoutEffect(() => {
+    if (pendingCursorRef.current && textareaRef.current) {
+      textareaRef.current.selectionStart = pendingCursorRef.current.start
+      textareaRef.current.selectionEnd = pendingCursorRef.current.end
+      pendingCursorRef.current = null
+    }
+  })
 
   // Scroll to source location when a tree node is clicked
   useEffect(() => {
@@ -121,6 +130,55 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }, [value, detectedFormat])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Tab') return
+
+    e.preventDefault()
+    const { selectionStart, selectionEnd } = e.currentTarget
+    const indent = '  '
+
+    if (!e.shiftKey) {
+      if (selectionStart === selectionEnd) {
+        const before = value.slice(0, selectionStart)
+        const after = value.slice(selectionEnd)
+        onChange(before + indent + after)
+        pendingCursorRef.current = {
+          start: selectionStart + indent.length,
+          end: selectionStart + indent.length,
+        }
+      } else {
+        const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
+        const block = value.slice(lineStart, selectionEnd)
+        const indented = block.replace(/^/gm, indent)
+        const lineCount = block.split('\n').length
+        onChange(value.slice(0, lineStart) + indented + value.slice(selectionEnd))
+        pendingCursorRef.current = {
+          start: selectionStart + indent.length,
+          end: selectionEnd + lineCount * indent.length,
+        }
+      }
+    } else {
+      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
+      const block = value.slice(lineStart, selectionEnd)
+      let removedBeforeCursor = 0
+      let totalRemoved = 0
+      let firstLine = true
+      const dedented = block.replace(/^ {1,2}/gm, (match) => {
+        if (firstLine) {
+          removedBeforeCursor = Math.min(match.length, selectionStart - lineStart)
+          firstLine = false
+        }
+        totalRemoved += match.length
+        return ''
+      })
+      onChange(value.slice(0, lineStart) + dedented + value.slice(selectionEnd))
+      pendingCursorRef.current = {
+        start: Math.max(lineStart, selectionStart - removedBeforeCursor),
+        end: selectionEnd - totalRemoved,
+      }
+    }
+  }, [value, onChange])
 
   const handleScroll = useCallback(() => {
     if (textareaRef.current && highlightRef.current) {
@@ -219,6 +277,7 @@ export default function InputArea({ value, onChange, onFileDrop, onClear, format
           ref={textareaRef}
           value={value}
           onChange={e => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
           onScroll={handleScroll}
           onClick={handleClick}
           placeholder="Paste JSON, JWT, XML, YAML, or drop a file (MessagePack, CBOR, Protobuf)..."
