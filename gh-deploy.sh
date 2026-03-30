@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REMOTE_URL=$(git remote get-url origin 2>/dev/null) || { echo "No remote 'origin' found"; exit 1; }
-REPO=$(echo "$REMOTE_URL" | sed -E 's#.+[:/]([^/]+/[^/]+?)(\.git)?$#\1#')
+REPO=$(echo "$REMOTE_URL" | sed -E 's#.*[:/]([^/]+/[^/]+)(\.git)?$#\1#')
 BRANCH="main"
 
 red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
